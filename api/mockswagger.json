@@ -1,0 +1,51 @@
+{
+  "swagger" : "2.0",
+  "info" : {
+    "version" : "2020-05-08T20:51:54Z",
+    "title" : "MockAPI"
+  },
+  "schemes" : [ "https" ],
+  "paths" : {
+    "/projects" : {
+      "get" : {
+        "consumes" : [ "application/json" ],
+        "produces" : [ "application/json" ],
+        "parameters" : [ {
+          "name" : "projectID",
+          "in" : "query",
+          "required" : true,
+          "type" : "string"
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "200 response",
+            "schema" : {
+              "$ref" : "#/definitions/Empty"
+            }
+          }
+        },
+        "x-amazon-apigateway-integration" : {
+          "responses" : {
+            "default" : {
+              "statusCode" : "200",
+              "responseTemplates" : {
+                "application/json" : "{\n    \"statusCode\":200,\n    \"files\": [\n        \"https://s3.amazonaws.com/redshift-downloads/drivers/RedshiftJDBC42-1.2.10.1009.jar\",\n        \"https://github.com/weaveworks/eksctl/releases/download/0.19.0-rc.1/eksctl_Darwin_amd64.tar.gz\",\n        \"https://github.com/weaveworks/eksctl/releases/download/0.19.0-rc.1/eksctl_Linux_amd64.tar.gz\",\n        \"https://github.com/weaveworks/eksctl/releases/download/0.19.0-rc.1/eksctl_Windows_amd64.zip\"\n    ]\n}"
+              }
+            }
+          },
+          "requestTemplates" : {
+            "application/json" : "{\"statusCode\": 200}"
+          },
+          "passthroughBehavior" : "when_no_match",
+          "type" : "mock"
+        }
+      }
+    }
+  },
+  "definitions" : {
+    "Empty" : {
+      "type" : "object",
+      "title" : "Empty Schema"
+    }
+  }
+}

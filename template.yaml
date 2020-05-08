@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  downloader
+
+  SAM template for Data Downloader with Callback Handler 
+
+Globals:
+  Function:
+    Timeout: 20
+
+Resources:
+
+  #Downloader Function handles receipt of file list from provider
+  DownloaderFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: downloader/
+      Handler: app.lambda_handler
+      Runtime: python3.6
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: CallbackRegistration
+        - DynamoDBWritePolicy:
+            TableName: CallbackFiles
+      Environment:
+        Variables:
+          FileTable: !Ref CallbackFileTable
+          CallbackUrl: !Ref CallbackAPI . #needs to be the deployed stage
+
+  #Datadownloader retrieves each file in file list from provider
+  #if files are large, this can be made into a container and use batch
+  #if files are small or Lambda Storage is increased, this can be done via this function
+  DatadownloaderFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: data_downloader/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.6
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: CallbackFiles
+        - S3WritePolicy:
+            BucketName: awstb-useast2-datacopy
+      Environment:
+        Variables:
+          FileTable: !Ref CallbackFileTable
+          Region: 'us-east-2'
+          Bucket: !Ref FileBucket
+
+  #CallbackWaiter is the start of the Step Function and waits for callback from provider
+  CallbackWaiterFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: callbackwaiter/
+      Handler: app.lambda_handler
+      Runtime: python3.6
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: CallbackRegistration
+            
+  #HandleCallback is the trigger point to continue the Step Function from the provider callback
+  HandleCallback:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: handlecallback/
+      Handler: app.lambda_handler
+      Runtime: python3.6
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: CallbackRegistration
+
+  #Step Function for handling coordination
+  #needs role for lambda.invoke + batch
+  
+  #DynamoDB table: CallbackRegistration
+  CallbackRegistrationTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CallbackRegistration
+      AttributeDefinitions:
+        -
+          AttributeName: URI
+          AttributeType: S
+      KeySchema:
+        -
+          AttributeName: URI
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  #DyanmoDB table: CallbackFiles
+  CallbackFileTable:
+    Type: AWS::DyanmoDB::Table
+    Properties:
+      TableName: CallbackFiles
+      AttributeDefinitions:
+        -
+          AttributeName: URI
+          AttributeType: S
+        -
+          AttributeName: FilenameURL
+          AttributeType: S
+      KeySchema:
+        -
+          AttributeName: URI
+          KeyType: HASH
+        -
+          AttributeName: FilenameURL
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+  
+  #S3:Bucket for data copy
+  FileBucket:
+    Type: AWS::S3:Bucket
+    Properties:
+      BucketName: datacopy
+      
+  #IAM roles and policies for Batch Service and Instances
+  IAMBatchServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArn: arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+      Description: Role for managing Batch Service
+      RoleName: AWSBatchServiceRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service:
+              - batch.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      
+  IAMInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArn: arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      Description: Role for instances in the Batch ECS Cluster
+      RoleName: ecsInstanceRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service:
+              - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'        
+
+  #API GW for Mock response
+  MockAPI:
+    Type:  AWS::Serverless::API
+    Properites:
+      DefinitionUri: api/mockswagger.json
+      EndpointConfiguration: REGIONAL
+      Name: MockAPI
+      OpenApiVersion: 2.0
+      StageName: Dev
+
+    
+
+
+  
+  

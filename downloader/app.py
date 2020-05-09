@@ -3,7 +3,6 @@ import json
 import os
 import requests
 
-sqs = boto3.client('sqs')
 dynamodb = boto3.client('dynamodb')
 filetable = os.getenv('FileTable', '')
 callbackurl = os.getenv('CallbackUrl', '')

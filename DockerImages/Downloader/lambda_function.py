@@ -4,9 +4,13 @@ import os
 import requests
 import sys
 
-dynamodb = boto3.client('dynamodb', region_name='us-east-2')
+###change these 3 lines
+region = 'us-east-2'
 filetable = os.getenv('FileTable', 'CallbackFiles')
-s3 = boto3.client('s3', region_name='us-east-2')
+bucket = os.getenv('Bucket', 'bucket')
+
+dynamodb = boto3.client('dynamodb', region_name=region)
+s3 = boto3.client('s3', region_name=region)
 def lambda_handler(event, context):
 
     URI = event['name']
@@ -24,7 +28,7 @@ def lambda_handler(event, context):
         response = requests.get(file['FilenameURL']['S'])
         if response.status_code == 200:
             open(fullfile, 'wb').write(response.content)
-            s3.put_object(Body=fullfile, Bucket='awstb-useast2-datacopy', Key=URI + "/" + shortfile)
+            s3.put_object(Body=fullfile, Bucket=bucket, Key=URI + "/" + shortfile)
             #could delete files from dynamodb
 
     return {

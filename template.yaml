@@ -20,13 +20,13 @@ Resources:
       Runtime: python3.6
       Policies:
         - DynamoDBReadPolicy:
-            TableName: CallbackRegistration
+            TableName: !Ref CallbackRegistrationTable
         - DynamoDBWritePolicy:
-            TableName: CallbackFiles
+            TableName: !Ref CallbackFileTable
       Environment:
         Variables:
           FileTable: !Ref CallbackFileTable
-          CallbackUrl: !Ref CallbackAPI . #needs to be the deployed stage
+          CallbackUrl: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev/" . #this needs to be MockAPI
 
   #Datadownloader retrieves each file in file list from provider
   #if files are large, this can be made into a container and use batch
@@ -39,13 +39,13 @@ Resources:
       Runtime: python3.6
       Policies:
         - DynamoDBReadPolicy:
-            TableName: CallbackFiles
+            TableName: !Ref CallbackFileTable
         - S3WritePolicy:
             BucketName: awstb-useast2-datacopy
       Environment:
         Variables:
           FileTable: !Ref CallbackFileTable
-          Region: 'us-east-2'
+          Region: !Ref AWS::Region
           Bucket: !Ref FileBucket
 
   #CallbackWaiter is the start of the Step Function and waits for callback from provider
@@ -57,7 +57,10 @@ Resources:
       Runtime: python3.6
       Policies:
         - DynamoDBWritePolicy:
-            TableName: CallbackRegistration
+            TableName: !Ref CallbackRegistrationTable
+      Environment:
+        Variables:
+          TableName: !Ref CallbackRegistrationTable
             
   #HandleCallback is the trigger point to continue the Step Function from the provider callback
   HandleCallback:
@@ -68,7 +71,16 @@ Resources:
       Runtime: python3.6
       Policies:
         - DynamoDBReadPolicy:
-            TableName: CallbackRegistration
+            TableName: !Ref CallbackRegistrationTable
+      Environment:
+        Variables:
+          TableName: !Ref CallbackRegistrationTable
+      Events:
+        ApiEvents:
+          Type: Api
+          Properties:
+            Path: /callbacka/{proxy}
+            Method: post
 
   #Step Function for handling coordination
   #needs role for lambda.invoke + batch
@@ -77,51 +89,48 @@ Resources:
   CallbackRegistrationTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: CallbackRegistration
       AttributeDefinitions:
         -
-          AttributeName: URI
-          AttributeType: S
+          AttributeName: 'URI'
+          AttributeType: 'S'
       KeySchema:
         -
-          AttributeName: URI
-          KeyType: HASH
+          AttributeName: 'URI'
+          KeyType: 'HASH'
       BillingMode: PAY_PER_REQUEST
 
   #DyanmoDB table: CallbackFiles
   CallbackFileTable:
-    Type: AWS::DyanmoDB::Table
+    Type: AWS::DynamoDB::Table
     Properties:
-      TableName: CallbackFiles
       AttributeDefinitions:
         -
-          AttributeName: URI
-          AttributeType: S
+          AttributeName: 'URI'
+          AttributeType: 'S'
         -
-          AttributeName: FilenameURL
-          AttributeType: S
+          AttributeName: 'FilenameURL'
+          AttributeType: 'S'
       KeySchema:
         -
-          AttributeName: URI
-          KeyType: HASH
+          AttributeName: 'URI'
+          KeyType: 'HASH'
         -
-          AttributeName: FilenameURL
-          KeyType: RANGE
+          AttributeName: 'FilenameURL'
+          KeyType: 'RANGE'
       BillingMode: PAY_PER_REQUEST
   
   #S3:Bucket for data copy
   FileBucket:
-    Type: AWS::S3:Bucket
-    Properties:
-      BucketName: datacopy
-      
+    Type: AWS::S3::Bucket
+
+
   #IAM roles and policies for Batch Service and Instances
   IAMBatchServiceRole:
     Type: AWS::IAM::Role
     Properties:
-      ManagedPolicyArn: arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+      ManagedPolicyArns: 
+        - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
       Description: Role for managing Batch Service
-      RoleName: AWSBatchServiceRole
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement: 
@@ -135,9 +144,9 @@ Resources:
   IAMInstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      ManagedPolicyArn: arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      ManagedPolicyArns: 
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role'
       Description: Role for instances in the Batch ECS Cluster
-      RoleName: ecsInstanceRole
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement: 
@@ -146,20 +155,118 @@ Resources:
               Service:
               - ec2.amazonaws.com
             Action:
-              - 'sts:AssumeRole'        
+              - 'sts:AssumeRole'
+  
+#Role for Job Definition.  This is over-privileged
+  IAMJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service:
+              - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+
+  IAMInstanceProfile:
+    Type:  AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref IAMInstanceRole
+  
+  StepFunctionsIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSXrayFullAccess'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal:
+              Service:
+              - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+  
+  StepFunctionsRunJobPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DownloaderStepFunctionsRunJobPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'batch:SubmitJob'
+              - 'batch:DescribeJobs'
+              - 'batch:TerminateJob'
+            Resource: '*'
+      Roles:
+        - !Ref StepFunctionsIAMRole
+  
+  StepFunctionsEventPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DownloaderStepFunctionsEventPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'events:PutTargets'
+              - 'events:PutRule'
+              - 'events:DescribeRule'
+            Resource: '*'
+      Roles:
+        - !Ref StepFunctionsIAMRole
 
   #API GW for Mock response
   MockAPI:
-    Type:  AWS::Serverless::API
-    Properites:
+    Type:  AWS::Serverless::Api
+    Properties:
       DefinitionUri: api/mockswagger.json
       EndpointConfiguration: REGIONAL
       Name: MockAPI
-      OpenApiVersion: 2.0
+      OpenApiVersion: "2.0"
       StageName: Dev
 
-    
-
-
+Outputs:
+  CallbackURL:
+    Description: "URL for callback "
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev/callbacka"
+  DownloaderJobIAMRole:
+    Description: "Role for Downloader Job"
+    Value: !Ref IAMJobRole
+  InstanceIAMRole:
+    Description: "Instance Role for Downloader Job"
+    Value: !Ref IAMInstanceRole
+  InstanceIAMProfile:
+    Description: "Instance Profile for Downloader Job"
+    Value: !Ref IAMInstanceProfile
+  BatchIAMRole:
+    Description: "Role for Batch Service"
+    Value: !Ref IAMBatchServiceRole
+  StepFunctionsIAMRole:
+    Description: "Role for Step Function"
+    Value: !Ref StepFunctionsIAMRole
+  WaiterFunctionArn:
+    Description: "Lambda function to wait for callback"
+    Value: !Ref CallbackWaiterFunction
+  FileListDownloaderArn:
+    Description: "Lambda function to download file list"
+    Value: !Ref DownloaderFunction
+  S3Bucket:
+    Description: "S3 Bucket for Copy of Files"
+    Value: !Ref FileBucket
+  DynamoDBFilesTable:
+    Description: "DynamoDB Table for File Downloading"
+    Value: !Ref CallbackFileTable
   
   

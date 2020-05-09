@@ -28,7 +28,7 @@ Resources:
           FileTable: !Ref CallbackFileTable
           CallbackUrl: !Sub 
             - "https://${MockApiUrl}.execute-api.${AWS::Region}.amazonaws.com/dev/projects"
-            - { MockApiUrl: !GetAtt MockAPI.RootResourceId }
+            - { MockApiUrl: !Ref MockAPI }
             
   #Datadownloader retrieves each file in file list from provider
   #if files are large, this can be made into a container and use batch
@@ -74,6 +74,12 @@ Resources:
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref CallbackRegistrationTable
+        - Version: 2012-10-17
+          Statement: 
+            - Effect: Allow
+              Action: 
+                - 'states:*'
+              Resource: '*'
       Environment:
         Variables:
           TableName: !Ref CallbackRegistrationTable
@@ -238,7 +244,7 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - 'lambda:Invoke'
+              - 'lambda:InvokeFunction'
             Resource: 
               - !GetAtt DownloaderFunction.Arn
               - !GetAtt CallbackWaiterFunction.Arn
@@ -254,17 +260,17 @@ Resources:
       EndpointConfiguration: REGIONAL
       Name: MockAPI
       OpenApiVersion: "2.0"
-      StageName: Dev
+      StageName: dev
 
 Outputs:
   MockURL:
     Description: "URL for Mock"
     Value: !Sub 
       - "https://${MockApiUrl}.execute-api.${AWS::Region}.amazonaws.com/dev/projects"
-      - { MockApiUrl: !GetAtt MockAPI.RootResourceId }
+      - { MockApiUrl: !Ref MockAPI }
   CallbackURL:
     Description: "URL for Callback"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev/callbacka"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/callbacka"
   DownloaderJobIAMRole:
     Description: "Role for Downloader Job"
     Value: !Ref IAMJobRole

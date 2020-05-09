@@ -5,9 +5,9 @@ import requests
 import sys
 
 ###change these 3 lines
-region = 'us-east-2'
-filetable = os.getenv('FileTable', 'CallbackFiles')
-bucket = os.getenv('Bucket', 'bucket')
+region = '<region>'
+filetable = os.getenv('FileTable', '<DynamoDBFilesTable>')
+bucket = os.getenv('Bucket', '<S3Bucket>')
 
 dynamodb = boto3.client('dynamodb', region_name=region)
 s3 = boto3.client('s3', region_name=region)

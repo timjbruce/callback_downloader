@@ -26,8 +26,10 @@ Resources:
       Environment:
         Variables:
           FileTable: !Ref CallbackFileTable
-          CallbackUrl: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev/" . #this needs to be MockAPI
-
+          CallbackUrl: !Sub 
+            - "https://${MockApiUrl}.execute-api.${AWS::Region}.amazonaws.com/dev/projects"
+            - { MockApiUrl: !GetAtt MockAPI.RootResourceId }
+            
   #Datadownloader retrieves each file in file list from provider
   #if files are large, this can be made into a container and use batch
   #if files are small or Lambda Storage is increased, this can be done via this function
@@ -226,6 +228,23 @@ Resources:
             Resource: '*'
       Roles:
         - !Ref StepFunctionsIAMRole
+  
+  StepFunctionsLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: DownloaderStepFunctionsLambdaPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'lambda:Invoke'
+            Resource: 
+              - !GetAtt DownloaderFunction.Arn
+              - !GetAtt CallbackWaiterFunction.Arn
+      Roles:
+        - !Ref StepFunctionsIAMRole
+  
 
   #API GW for Mock response
   MockAPI:
@@ -238,8 +257,13 @@ Resources:
       StageName: Dev
 
 Outputs:
+  MockURL:
+    Description: "URL for Mock"
+    Value: !Sub 
+      - "https://${MockApiUrl}.execute-api.${AWS::Region}.amazonaws.com/dev/projects"
+      - { MockApiUrl: !GetAtt MockAPI.RootResourceId }
   CallbackURL:
-    Description: "URL for callback "
+    Description: "URL for Callback"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev/callbacka"
   DownloaderJobIAMRole:
     Description: "Role for Downloader Job"
@@ -256,10 +280,10 @@ Outputs:
   StepFunctionsIAMRole:
     Description: "Role for Step Function"
     Value: !Ref StepFunctionsIAMRole
-  WaiterFunctionArn:
+  WaiterFunction:
     Description: "Lambda function to wait for callback"
     Value: !Ref CallbackWaiterFunction
-  FileListDownloaderArn:
+  FileListDownloader:
     Description: "Lambda function to download file list"
     Value: !Ref DownloaderFunction
   S3Bucket:

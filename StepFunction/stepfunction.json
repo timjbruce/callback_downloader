@@ -1,0 +1,49 @@
+{
+  "Comment": "Registration for Callback URL and process to download content",
+  "StartAt": "WaitForCallback",
+  "States": {
+    "WaitForCallback": {
+      "Comment": "Stores project info and callback token then waits for resume signal",
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "ResultPath":"$.data.lambdaresult",
+      "Parameters":
+      {
+        "FunctionName":"<WaiterFunction - Lambda function to wait for callback >",
+        "Payload": {
+          "uri.$": "$$.Execution.Name",
+          "token.$":"$$.Task.Token",
+          "projectid.$": "$.projectid"
+         }
+      },
+      "ResultPath": null,
+      "Next": "GetFilesToDownload"
+    },
+    "GetFilesToDownload": {
+      "Comment": "Retrieves list of files to download",
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName":"<FileListDownloader - Lambda function to download file list>",
+        "Payload":{
+          "name.$":"$$.Execution.Name",
+          "projectid.$":"$.projectid"
+        }
+      },
+      "ResultPath": null,
+      "Next": "DownloadFiles"
+    },
+    "DownloadFiles": {
+      "Comment": "Retrieves files via AWS Batch",
+      "Type": "Task",
+      "Resource":"arn:aws:states:::batch:submitJob.sync",
+      "Parameters": {
+        "JobDefinition":"<JobDefinitionArn>",
+        "JobName.$":"$$.Execution.Name",
+        "JobQueue":"<JobQueueArn>",
+        "Parameters":{"URI.$":"$$.Execution.Name"}
+      },
+      "End": true
+    }
+  }
+}

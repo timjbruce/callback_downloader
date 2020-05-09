@@ -180,21 +180,22 @@ Before we setup the Step Function in the AWS Console, we are going to edit the f
 <br>
 Return to the AWS Console for the next set of steps.
 <br>
-1. Navigate to Step Functions in the AWS Console
-2. Click on State Machines in the Left Hand Menu
-3. Click Create State Machine
-4. Choose the following options.
+
+4. Navigate to Step Functions in the AWS Console
+5. Click on State Machines in the Left Hand Menu
+6. Click Create State Machine
+7. Choose the following options.
    - Author with Code Snippets
    - Type: Standard
-5. Delete the JSON content in Definition
-6. Paste in your updated Step Function that was modified in the steps above.
-7. Click Next
-8. Enter the following values
+8. Delete the JSON content in Definition
+9. Paste in your updated Step Function that was modified in the steps above.
+10. Click Next
+11. Enter the following values
    - Name: Downloader
    - Permissions: Choose an existing role
    - Role: Choose the Role for <StepFunctionsIAMRole - Role for Step Function> from the SAM output
    - Logging Level: Off
-9. Click Create State Machine
+12. Click Create State Machine
 
 <br>
 Logging requires additional IAM configuration to allow the Step Function Role to write to CloudWatch Logs.  You can find information about the changes required [here](https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html).

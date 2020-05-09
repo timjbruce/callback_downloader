@@ -28,7 +28,7 @@ def lambda_handler(event, context):
         response = requests.get(file['FilenameURL']['S'])
         if response.status_code == 200:
             open(fullfile, 'wb').write(response.content)
-            s3.put_object(Body=fullfile, Bucket=bucket, Key=URI + "/" + shortfile)
+            s3.put_object(Body=open(fullfile, 'rb'), Bucket=bucket, Key=URI + "/" + shortfile)
             #could delete files from dynamodb
 
     return {

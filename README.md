@@ -4,7 +4,7 @@ This project uses an AWS Step Function to manage the response to a callback URL 
 
 This Step Function is a State Machine that allows an organization to create a unique callback URL for a project and wait for a callback.  When the callback URL is accessed by the third party, a AWS Lambda function will signal the State Machine to continue.  Upon continuing, the State Machine will download a list of files from a pre-configured location using a Lambda function and then download the files using AWS Batch.<br>
 
-For those unfamiliar, a callback is used when processing is performed by a third party which could take an extended period of time.  This type of process allows you to automatically respond to the callback and then continue processing.<br>
+For those unfamiliar, a callback is used when processing is performed by a third party which could take an extended period of time.  This type of process allows you to automatically respond to åthe callback and then continue processing.<br>
 ![Overview of Callback Process](https://raw.githubusercontent.com/timjbruce/callback_downloader/master/images/callbackprocess.png)
 
 The State Machine is the feature that is managing the process on your side and taking action upon the signal from the third party.  In this case, the State Machine is simply 3 steps:
@@ -54,6 +54,7 @@ Go back to the console/command line for the workstation you have cloned the proj
 <br>
 
 <br>
+
 4. Navigate to the callback_downloader/DockerImages/Downloader directory
 5. Modify the lambda_function.py file (lines 8 - 10) and save the file.
    - Line 8: Change <Region> to the AWS Region you deployed the SAM template to
@@ -219,15 +220,21 @@ At this point, you wiill see a screen with an Execution Name and Input section. 
 
 <br>
 At this point, your process should look similar to the below image.  The process will stay like this until a callback is received.  You may start additional State Machines and have a number of them waiting for callback.
+
 ![Awaiting Callback](https://raw.githubusercontent.com/timjbruce/callback_downloader/master/images/step1.png)
+
 <br>
 7. At a console, type in `curl -X POST <CallbackURL - URL for Callback>/<ExecutionName>` and press enter.  Replace the CallbackURL with the value from your SAM outputs and the ExecutionName with one of your Step Function Execution Names.  This will send the signal to Step Functions to continue that execution.
 
 <br>
 If you watch close enough, you will see the "WaitForCallback" Step wiill turn Green, to signify it has completed successfully.  The "GetFilesToDownload" step will turn Blue to show it is proceeding.  It may turn Green rather quickly, which is good as that signals success.  In this case, the "DownloadFiles" step will turn Blue to show it is starting.
+
 ![Callback Has Occurred](https://raw.githubusercontent.com/timjbruce/callback_downloader/master/images/step2.png)
+
 ![Downloading Files](https://raw.githubusercontent.com/timjbruce/callback_downloader/master/images/step3.png)
+
 
 <br>
 After the conclusion of downloading the files, your process should show green for all steps, like below.  Additionally, if you check in your S3 bucket, you will find a set of keys for the Execution Name matching those provided by the Mock API.
+
 ![Process Complete](https://raw.githubusercontent.com/timjbruce/callback_downloader/master/images/complete.png)
